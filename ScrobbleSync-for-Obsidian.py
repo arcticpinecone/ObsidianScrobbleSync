@@ -2,16 +2,31 @@ import requests
 import csv
 import hashlib
 from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
 import os
 from collections import defaultdict
 
+# Load environment variables from .env file
+load_dotenv()
+
 # Configuration
-API_KEY = "YOUR-API-KEY"
-SHARED_SECRET = "YOUR-SHARED-SECRET"
-USERNAME = "LASTFM-USERNAME"
-OUTPUT_CSV = "lastfm_history.csv"
-OBSIDIAN_FOLDER = "C:/temp"
+API_KEY = os.getenv("LASTFM_API_KEY")
+SHARED_SECRET = os.getenv("LASTFM_SHARED_SECRET")
+USERNAME = os.getenv("LASTFM_USERNAME")
 USER_AGENT = "ScrobbleSync/1.0 (Contact: your-last-fm-email@address.com)"
+OUTPUT_CSV = "lastfm_history.csv"
+OBSIDIAN_FOLDER = "C:/Users/user/ObsidianVault/Entertainment/Music/Last.fm History"
+
+
+# Path customization function
+def get_note_path(base_folder, date_str, structure="{year}/{month}/LastFM_{date}.md"):
+    """Generate the file path for the note based on the date and user-defined structure."""
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d") if date_str != "Today" else datetime.now()
+    year = date_obj.strftime("%Y")
+    month = date_obj.strftime("%m")
+    day = date_obj.strftime("%d")
+    path = structure.format(year=year, month=month, day=day, date=date_str)
+    return os.path.join(base_folder, path)
 
 # Helper Functions
 def generate_api_signature(params):
@@ -62,27 +77,76 @@ def parse_tracks_to_csv(tracks, output_file):
             timestamp = track["date"]["uts"] if "date" in track else "Now Playing"
             writer.writerow([artist, track_name, album, timestamp])
 
-def generate_markdown_from_csv_grouped(csv_file, obsidian_folder):
+def generate_markdown_from_csv_grouped(csv_file, obsidian_folder, structure="{year}/{month}/LastFM_{date}.md"):
     """Generate grouped Markdown tables by date from CSV."""
     grouped_data = defaultdict(list)
-    with open(csv_file, mode="r", encoding="utf-8") as csv_file:
-        reader = csv.DictReader(csv_file)
+    now_playing = []
+
+    with open(csv_file, mode="r", encoding="utf-8") as csv_file_handle:
+        reader = csv.DictReader(csv_file_handle)
         for row in reader:
             timestamp = datetime.fromtimestamp(int(row["Timestamp"]), timezone.utc) if row["Timestamp"].isdigit() else "Now Playing"
             date_str = timestamp.strftime("%Y-%m-%d") if timestamp != "Now Playing" else "Today"
-            grouped_data[date_str].append(row)
+            if date_str == "Today":
+                now_playing.append(row)
+            else:
+                grouped_data[date_str].append(row)
 
+    # Debugging: Check if now_playing has entries
+    print(f"Now Playing Tracks: {now_playing}")
+
+    # Write "Now Playing" file if any track is found
+    if now_playing:
+        print("Writing 'Now Playing' file...")
+        markdown_file = os.path.join(obsidian_folder, "LastFM_NowPlaying.md")
+        os.makedirs(os.path.dirname(markdown_file), exist_ok=True)
+        with open(markdown_file, mode="w", encoding="utf-8") as md_file:
+            # YAML Frontmatter
+            iso8601time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
+            md_file.write("---\n")
+            md_file.write(f"noteid: \"[[NowPlaying]]\"\n")
+            md_file.write(f"iso8601time: \"{iso8601time}\"\n")
+            md_file.write("notetype: \"[[LastFM]]\"\n")
+            md_file.write("tags:\n")
+            md_file.write("  - LastFM\n")
+            md_file.write("  - NowPlaying\n")
+            md_file.write("---\n\n")
+
+            # Markdown Content
+            md_file.write("# Last.fm - Now Playing\n\n")
+            md_file.write("| Track | Artist | Album | Timestamp |\n")
+            md_file.write("|-------|--------|-------|-----------|\n")
+            for track in now_playing:
+                md_file.write(f"| **{track['Track']}** | *{track['Artist']}* | {track['Album']} | {iso8601time} |\n")
+    else:
+        print("No 'Now Playing' tracks found.")
+
+    # Write scrobble history files
     for date, tracks in grouped_data.items():
         # Sort tracks by timestamp in ascending order
         sorted_tracks = sorted(tracks, key=lambda x: int(x["Timestamp"]) if x["Timestamp"].isdigit() else 0)
-        markdown_file = os.path.join(obsidian_folder, f"LastFM_{date}.md")
+        markdown_file = get_note_path(obsidian_folder, date, structure)
+        os.makedirs(os.path.dirname(markdown_file), exist_ok=True)
+
         with open(markdown_file, mode="w", encoding="utf-8") as md_file:
-            md_file.write(f"# Last.fm\n")
-            md_file.write(f"> Listening History for: [[{date}]]\n\n")
+            # YAML frontmatter
+            noteid = f"[[LastFM_{date}]]"
+            iso8601time = f"{date}T{datetime.now(timezone.utc).strftime('%H:%M:%S')}"
+            md_file.write("---\n")
+            md_file.write(f"noteid: \"{noteid}\"\n")
+            md_file.write(f"iso8601time: \"{iso8601time}\"\n")
+            md_file.write("notetype: \"[[LastFM]]\"\n")
+            md_file.write("tags:\n")
+            md_file.write("  - LastFM\n")
+            md_file.write("  - Scrobble\n")
+            md_file.write("---\n\n")
+
+            # Header for scrobble history
+            md_file.write(f"# Last.fm - Scrobble History ({date})\n\n")
             md_file.write("| Track | Artist | Album | Timestamp |\n")
             md_file.write("|-------|--------|-------|-----------|\n")
             for track in sorted_tracks:
-                timestamp = datetime.fromtimestamp(int(track["Timestamp"]), timezone.utc).strftime("%H:%M:%S") if track["Timestamp"].isdigit() else "Now Playing"
+                timestamp = datetime.fromtimestamp(int(track["Timestamp"]), timezone.utc).strftime("%H:%M:%S")
                 md_file.write(f"| **{track['Track']}** | *{track['Artist']}* | {track['Album']} | {timestamp} |\n")
 
 # Main Functionality
