@@ -13,10 +13,9 @@ load_dotenv()
 API_KEY = os.getenv("LASTFM_API_KEY")
 SHARED_SECRET = os.getenv("LASTFM_SHARED_SECRET")
 USERNAME = os.getenv("LASTFM_USERNAME")
-USER_AGENT = "ScrobbleSync/1.0 (Contact: your-last-fm-email@address.com)"
-OUTPUT_CSV = "lastfm_history.csv"
-OBSIDIAN_FOLDER = "C:/Users/user/ObsidianVault/Entertainment/Music/Last.fm History"
-
+USER_AGENT = os.getenv("LASTFM_USERAGENT")
+OUTPUT_CSV = os.getenv("OUTPUT_CSV")
+OBSIDIAN_FOLDER = os.getenv("OBSIDIAN_PATH")
 
 # Path customization function
 def get_note_path(base_folder, date_str, structure="{year}/{month}/LastFM_{date}.md"):
