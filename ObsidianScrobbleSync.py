@@ -148,6 +148,16 @@ def generate_markdown_from_csv_grouped(csv_file, obsidian_folder, structure="{ye
                 timestamp = datetime.fromtimestamp(int(track["Timestamp"]), timezone.utc).strftime("%H:%M:%S")
                 md_file.write(f"| **{track['Track']}** | *{track['Artist']}* | {track['Album']} | {timestamp} |\n")
 
+            # Add the Footer for scrobble history
+            md_file.write("\n---\n")
+            md_file.write("# Resource(s):: \n")
+            md_file.write("## ➡ [External / Web]\n")
+            md_file.write("- [Last.fm | Play music find songs and discover artists](https://www.last.fm)\n")
+            md_file.write("## ⬅️ [Internal / Filesystem] \n")
+            md_file.write(f"- [[{date}]]\n")
+            md_file.write("---\n")
+            md_file.write(f"[[#Last.fm - Scrobble History ({date})|Return to Top]]\n")
+
 # Main Functionality
 def main():
     # Adjust time range here
