@@ -5,7 +5,7 @@ Integrating with Obsidian for managing daily music history locally.
 
 ---
 
-![DailyNote](images\DailyNote.png)
+![DailyNote](https://github.com/arcticpinecone/ObsidianScrobbleSync/blob/master/images/DailyNote.png)
 
 ---
 
